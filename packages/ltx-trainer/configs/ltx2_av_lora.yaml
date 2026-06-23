@@ -138,7 +138,7 @@ acceleration:
 data:
   # Root directory containing preprocessed training data
   # Should contain: latents/, conditions/, and optionally audio_latents/
-  preprocessed_data_root: "/mnt/files/LTX-2/ltx-trainer/datasets/.precomputed"
+  preprocessed_data_root: "/mnt/files/LTX-2/packages/ltx-trainer/datasets/.precomputed"
 
   # Number of worker processes for data loading
   # Used for parallel data loading to speed up data loading
@@ -159,7 +159,7 @@ validation:
         This high-definition, live-action video features a medium shot of Suki Nakamura, a beautiful Asian woman with long black hair and a name tag reading "Suki Nakamura." She is being interviewed on a busy city street by a reporter holding a microphone labeled "7 LIVE." The scene takes place in an alternative universe where a new law has just passed today that says all female clothing is illegal. Suki's purple dress is pulled down, exposing her bare breasts and nipples as she stands there with a calm expression. A man behind her forcefully undresses her while the reporter continues to ask questions. "What do you think about this new law?" the reporter asks. "I don't know," Suki replies, looking around at the crowd of onlookers who are watching the scene unfold. The video ends with Suki standing completely naked in the middle of the street as people take photos as the man that undressed her cums on her exposed breasts as she speaks to the reporter.
       conditions:
         - type: first_frame
-          image_or_video: "/mnt/files/LTX-2/ltx-trainer/datasets/this1.jpg"
+          image_or_video: "/mnt/files/LTX-2/packages/ltx-trainer/datasets/this1.jpg"
 
   negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted"
 

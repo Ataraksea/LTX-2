@@ -485,8 +485,19 @@ class LtxvTrainer:
         self._resume_state = self._resolve_resume_state()
 
     def _load_full_checkpoint(self, checkpoint_path: Path) -> None:
-        """Load full model checkpoint."""
-        state_dict = load_file(checkpoint_path)
+        """Load full model checkpoint.
+
+        Newer checkpoints are written as safetensors. Older checkpoints were saved
+        with ``torch.save`` (a zip/pickle) despite the ``.safetensors`` extension, so
+        fall back to ``torch.load`` for backward compatibility.
+        """
+        try:
+            state_dict = load_file(checkpoint_path)
+        except Exception:
+            logger.warning(
+                "⚠️ Checkpoint is not in safetensors format; loading with torch.load (legacy format)."
+            )
+            state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
         self._transformer.load_state_dict(state_dict, strict=True)
 
         logger.info("✅ Full model checkpoint loaded successfully")
@@ -959,11 +970,17 @@ class LtxvTrainer:
             # Save to disk with metadata
             save_file(state_dict, saved_weights_path, metadata=metadata)
         else:
-            # Cast to configured precision
-            full_state_dict = {k: v.to(save_dtype) if isinstance(v, Tensor) else v for k, v in full_state_dict.items()}
+            # Cast to configured precision; safetensors requires contiguous tensors
+            full_state_dict = {
+                k: v.to(save_dtype).contiguous() if isinstance(v, Tensor) else v
+                for k, v in full_state_dict.items()
+            }
 
-            # Save to disk
-            self._accelerator.save(full_state_dict, saved_weights_path)
+            # Build metadata for safetensors file
+            metadata = self._build_checkpoint_metadata()
+
+            # Save to disk as safetensors (matches the .safetensors extension and loader)
+            save_file(full_state_dict, saved_weights_path, metadata=metadata)
 
         rel_path = saved_weights_path.relative_to(self._config.output_dir)
         logger.info(f"💾 {prefix.capitalize()} weights for step {self._global_step} saved in {rel_path}")

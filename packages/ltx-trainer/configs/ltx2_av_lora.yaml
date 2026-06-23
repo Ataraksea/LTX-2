@@ -38,7 +38,7 @@ model:
 
   # Optional: Path to resume training from a checkpoint
   # Can be a checkpoint file (.safetensors) or directory (uses latest checkpoint)
-  load_checkpoint: null
+  load_checkpoint: "/mnt/files/LTX-2/packages/ltx-trainer/outputs/ltx2_av_lora/checkpoints/"
 
 # -----------------------------------------------------------------------------
 # Training Strategy Configuration
@@ -100,7 +100,7 @@ optimization:
 
   # Learning rate scheduler type
   # Options: "constant", "linear", "cosine", "cosine_with_restarts", "polynomial"
-  scheduler_type: "polynomial"
+  scheduler_type: "linear"
 
   # Additional scheduler parameters (depends on scheduler_type)
   scheduler_params: { }
@@ -142,7 +142,7 @@ data:
 
   # Number of worker processes for data loading
   # Used for parallel data loading to speed up data loading
-  num_dataloader_workers: 4
+  num_dataloader_workers: 2
 
 # -----------------------------------------------------------------------------
 # Validation Configuration
@@ -211,13 +211,13 @@ checkpoints:
 
   # Number of most recent checkpoints to keep
   # Set to -1 to keep all checkpoints
-  keep_last_n: -1
+  keep_last_n: 3
 
   # Precision to use when saving checkpoint weights
   # Options: "bfloat16" (default, smaller files) or "float32" (full precision)
   precision: "bfloat16"
 
-  save_training_state: "full"
+  #save_training_state: "full"
 
 # -----------------------------------------------------------------------------
 # Flow Matching Configuration

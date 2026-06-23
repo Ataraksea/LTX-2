@@ -138,7 +138,7 @@ acceleration:
 data:
   # Root directory containing preprocessed training data
   # Should contain: latents/, conditions/, and optionally audio_latents/
-  preprocessed_data_root: "/mnt/filrd/LTX-2/ltx-trainer/datasets/.precomputed"
+  preprocessed_data_root: "/mnt/files/LTX-2/ltx-trainer/datasets/.precomputed"
 
   # Number of worker processes for data loading
   # Used for parallel data loading to speed up data loading

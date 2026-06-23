@@ -163,6 +163,22 @@ class FlexibleStrategyConfig(TrainingStrategyConfigBase):
     )
 
     @model_validator(mode="after")
+    def disable_modalities_without_latents_dir(self) -> "FlexibleStrategyConfig":
+        """Treat a modality with an empty ``latents_dir`` as disabled (not present).
+
+        The shipped config templates include an audio block with ``latents_dir: ""``
+        as a placeholder for video-only training. Without this, an empty ``latents_dir``
+        would create an empty-string data-source key in ``get_data_sources()``, causing
+        the loader to look for files directly under ``preprocessed_data_root`` and skip
+        every sample.
+        """
+        if self.video is not None and not self.video.latents_dir:
+            self.video = None
+        if self.audio is not None and not self.audio.latents_dir:
+            self.audio = None
+        return self
+
+    @model_validator(mode="after")
     def validate_at_least_one_generated(self) -> "FlexibleStrategyConfig":
         """Ensure at least one modality has is_generated=true."""
         has_video_target = self.video is not None and self.video.is_generated

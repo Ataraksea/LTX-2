@@ -26,69 +26,19 @@
 model:
   # Path to the LTX-2 model checkpoint (.safetensors file)
   # This should be a local path to your downloaded model
-  model_path: "path/to/ltx-2-model.safetensors"
+  model_path: "/mnt/files/ComfyUI/models/checkpoints/ltx-2.3-22b-dev.safetensors"
 
   # Path to the text encoder model directory
   # For LTX-2, this is typically the Gemma-based text encoder
-  text_encoder_path: "path/to/gemma-text-encoder"
+  text_encoder_path: "/mnt/files/ComfyUI/models/diffusers/gemma-3-12b-it"
 
   # Training mode: "lora" for efficient adapter training, "full" for full fine-tuning
   # LoRA is recommended for most use cases (faster, less memory, prevents overfitting)
-  training_mode: "lora"
+  training_mode: "full"
 
   # Optional: Path to resume training from a checkpoint
   # Can be a checkpoint file (.safetensors) or directory (uses latest checkpoint)
   load_checkpoint: null
-
-# -----------------------------------------------------------------------------
-# LoRA Configuration
-# -----------------------------------------------------------------------------
-# Controls the Low-Rank Adaptation parameters for efficient fine-tuning.
-lora:
-  # Rank of the LoRA matrices (higher = more capacity but more parameters)
-  # Typical values: 8, 16, 32, 64. Start with 32 for general fine-tuning.
-  rank: 32
-
-  # Alpha scaling factor (usually set equal to rank)
-  # The effective scaling is alpha/rank, so alpha=rank means scaling of 1.0
-  alpha: 32
-
-  # Dropout probability for LoRA layers (0.0 = no dropout)
-  # Can help with regularization if overfitting occurs
-  dropout: 0.0
-
-  # Which transformer modules to apply LoRA to
-  # The LTX-2 transformer has separate attention and FFN blocks for video and audio:
-  #
-  # VIDEO MODULES:
-  #   - attn1.to_k, attn1.to_q, attn1.to_v, attn1.to_out.0  (video self-attention)
-  #   - attn2.to_k, attn2.to_q, attn2.to_v, attn2.to_out.0  (video cross-attention to text)
-  #   - ff.net.0.proj, ff.net.2                             (video feed-forward)
-  #
-  # AUDIO MODULES:
-  #   - audio_attn1.to_k, audio_attn1.to_q, audio_attn1.to_v, audio_attn1.to_out.0  (audio self-attention)
-  #   - audio_attn2.to_k, audio_attn2.to_q, audio_attn2.to_v, audio_attn2.to_out.0  (audio cross-attention to text)
-  #   - audio_ff.net.0.proj, audio_ff.net.2                                         (audio feed-forward)
-  #
-  # AUDIO-VIDEO CROSS-ATTENTION MODULES (for cross-modal interaction):
-  #   - audio_to_video_attn.to_k, audio_to_video_attn.to_q, audio_to_video_attn.to_v, audio_to_video_attn.to_out.0
-  #       (Q from video, K/V from audio - allows video to attend to audio features)
-  #   - video_to_audio_attn.to_k, video_to_audio_attn.to_q, video_to_audio_attn.to_v, video_to_audio_attn.to_out.0
-  #       (Q from audio, K/V from video - allows audio to attend to video features)
-  #
-  # Using short patterns like "to_k" matches ALL attention modules (video, audio, and cross-modal).
-  # For audio-video training, this is the recommended approach.
-  target_modules:
-    # Attention layers (matches both video and audio branches)
-    - "to_k"
-    - "to_q"
-    - "to_v"
-    - "to_out.0"
-    # Uncomment below to also train feed-forward layers (can increase the LoRA's capacity):
-    # - "ff.net.0.proj"
-    # - "ff.net.2"
-    # - "audio_ff.net.0.proj"
-    # - "audio_ff.net.2"
 
 # -----------------------------------------------------------------------------
 # Training Strategy Configuration
@@ -96,21 +46,31 @@ lora:
 # Defines the text-to-video training approach.
 training_strategy:
   # Strategy name: "text_to_video" for standard text-to-video training
-  name: "text_to_video"
+  name: "flexible"
 
-  # Probability of conditioning on the first frame during training
-  # Higher values train the model to perform better in image-to-video (I2V) mode,
-  # where a clean first frame is provided and the model generates the rest of the video
-  # Increase this value to train the model to perform better in image-to-video (I2V) mode
-  first_frame_conditioning_p: 0.5
+  # Video modality configuration
+  video:
+    # Whether the model generates video (true) or uses it as frozen conditioning (false)
+    is_generated: true
+    # Directory name (within preprocessed_data_root) containing video latents
+    latents_dir: "latents"
 
-  # Enable joint audio-video training
-  # Set to true if your dataset includes audio and you want to train the audio branch
-  with_audio: true
+    # Conditions applied to the video modality during training
+    # First-frame conditioning: the first frame of each video is provided as a clean
+    # conditioning signal (no noise, timestep=0, excluded from loss)
+    conditions:
+      - type: first_frame
+        # Probability of applying first-frame conditioning per training sample
+        # At 0.5, half the training samples use I2V mode, half use pure T2V
+        # Higher values improve I2V quality but may reduce T2V diversity
+        probability: 0.5
 
-  # Directory name (within preprocessed_data_root) containing audio latents
-  # Only used when with_audio is true
-  audio_latents_dir: "audio_latents"
+  # Audio modality configuration
+  audio:
+    # Whether the model generates audio (true) or uses it as frozen conditioning (false)
+    is_generated: false
+    # Directory name (within preprocessed_data_root) containing audio latents
+    latents_dir: ""
 
 # -----------------------------------------------------------------------------
 # Optimization Configuration
@@ -136,11 +96,11 @@ optimization:
   max_grad_norm: 1.0
 
   # Optimizer type: "adamw" (standard) or "adamw8bit" (memory-efficient)
-  optimizer_type: "adamw"
+  optimizer_type: "adamw8bit"
 
   # Learning rate scheduler type
   # Options: "constant", "linear", "cosine", "cosine_with_restarts", "polynomial"
-  scheduler_type: "linear"
+  scheduler_type: "polynomial"
 
   # Additional scheduler parameters (depends on scheduler_type)
   scheduler_params: { }
@@ -160,16 +120,16 @@ acceleration:
 
   # Model quantization for reduced memory usage
   # Options: null (none), "int8-quanto", "int4-quanto", "int2-quanto", "fp8-quanto", "fp8uz-quanto"
-  quantization: null
+  quantization: fp8-quanto
 
   # Load text encoder in 8-bit precision to save memory
   # Useful when GPU memory is limited
-  load_text_encoder_in_8bit: false
+  load_text_encoder_in_8bit: true
 
   # Offload optimizer state to CPU during validation video sampling.
   # Helps avoid OOM when VAE decoder + transformer + optimizer state can't coexist
   # on the GPU (full fine-tune, high-rank LoRA). No effect for FSDP.
-  offload_optimizer_during_validation: false
+  offload_optimizer_during_validation: true
 
 # -----------------------------------------------------------------------------
 # Data Configuration
@@ -178,11 +138,11 @@ acceleration:
 data:
   # Root directory containing preprocessed training data
   # Should contain: latents/, conditions/, and optionally audio_latents/
-  preprocessed_data_root: "/path/to/preprocessed/data"
+  preprocessed_data_root: "/mnt/filrd/LTX-2/ltx-trainer/datasets/.precomputed"
 
   # Number of worker processes for data loading
   # Used for parallel data loading to speed up data loading
-  num_dataloader_workers: 2
+  num_dataloader_workers: 4
 
 # -----------------------------------------------------------------------------
 # Validation Configuration
@@ -194,24 +154,22 @@ validation:
   # Text prompts for validation video generation
   # Provide prompts representative of your training data
   # LTX-2 prefers longer, detailed prompts that describe both visual content and audio
-  prompts:
-    - "A woman with long brown hair sits at a wooden desk in a cozy home office, typing on a laptop while occasionally glancing at notes beside her. Soft natural light streams through a large window, casting warm shadows across the room. She pauses to take a sip from a ceramic mug, then continues working with focused concentration. The audio captures the gentle clicking of keyboard keys, the soft rustle of papers, and ambient room tone with occasional distant bird chirps from outside."
-    - "A chef in a white uniform stands in a professional kitchen, carefully plating a gourmet dish with precise movements. Steam rises from freshly cooked vegetables as he arranges them with tweezers. The stainless steel surfaces gleam under bright overhead lights, and various pots simmer on the stove behind him. The audio features the sizzling of pans, the clinking of utensils against plates, and the ambient hum of kitchen ventilation."
+  samples:
+    - prompt: >-
+        This high-definition, live-action video features a medium shot of Suki Nakamura, a beautiful Asian woman with long black hair and a name tag reading "Suki Nakamura." She is being interviewed on a busy city street by a reporter holding a microphone labeled "7 LIVE." The scene takes place in an alternative universe where a new law has just passed today that says all female clothing is illegal. Suki's purple dress is pulled down, exposing her bare breasts and nipples as she stands there with a calm expression. A man behind her forcefully undresses her while the reporter continues to ask questions. "What do you think about this new law?" the reporter asks. "I don't know," Suki replies, looking around at the crowd of onlookers who are watching the scene unfold. The video ends with Suki standing completely naked in the middle of the street as people take photos as the man that undressed her cums on her exposed breasts as she speaks to the reporter.
+      conditions:
+        - type: first_frame
+          image_or_video: "/mnt/files/LTX-2/ltx-trainer/datasets/this1.jpg"
 
-  # Negative prompt to avoid unwanted artifacts
   negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted"
-
-  # Optional: First frame images for image-to-video validation
-  # If provided, must have one image per prompt
-  images: null
 
   # Output video dimensions [width, height, frames]
   # Width and height must be divisible by 32
   # Frames must satisfy: frames % 8 == 1 (e.g., 1, 9, 17, 25, 33, 41, 49, 57, 65, 73, 81, 89, ...)
-  video_dims: [ 576, 576, 89 ]
+  video_dims: [ 416, 704, 121 ]
 
   # Frame rate for generated videos
-  frame_rate: 25.0
+  frame_rate: 24.0
 
   # Random seed for reproducible validation outputs
   seed: 42
@@ -232,7 +190,7 @@ validation:
   # STG is combined with CFG for better temporal coherence
   stg_scale: 1.0  # Recommended: 1.0 (0.0 disables STG)
   stg_blocks: [29]  # Recommended: single block 29
-  stg_mode: "stg_av"  # "stg_av" perturbs both audio and video, "stg_v" video only
+  stg_mode: "stg_v"  # "stg_av" perturbs both audio and video, "stg_v" video only
 
   # Whether to generate audio in validation samples
   # Independent of training_strategy.with_audio - you can generate audio
@@ -249,7 +207,7 @@ validation:
 checkpoints:
   # Save a checkpoint every N steps
   # Set to null to disable intermediate checkpoints
-  interval: 250
+  interval: 100
 
   # Number of most recent checkpoints to keep
   # Set to -1 to keep all checkpoints
@@ -258,6 +216,8 @@ checkpoints:
   # Precision to use when saving checkpoint weights
   # Options: "bfloat16" (default, smaller files) or "float32" (full precision)
   precision: "bfloat16"
+
+  save_training_state: "full"
 
 # -----------------------------------------------------------------------------
 # Flow Matching Configuration
@@ -289,13 +249,13 @@ hub:
 # Settings for experiment tracking with W&B.
 wandb:
   # Enable W&B logging
-  enabled: false
+  enabled: true
 
   # W&B project name
-  project: "ltx-2-trainer"
+  project: "my-awesome-project"
 
   # W&B username or team (null uses default account)
-  entity: null
+  entity: "xtysocx-janeagi"
 
   # Tags to help organize runs
   tags: [ "ltx2", "lora" ]

@@ -120,7 +120,7 @@ acceleration:
 
   # Model quantization for reduced memory usage
   # Options: null (none), "int8-quanto", "int4-quanto", "int2-quanto", "fp8-quanto", "fp8uz-quanto"
-  quantization: fp8-quanto
+  quantization: null
 
   # Load text encoder in 8-bit precision to save memory
   # Useful when GPU memory is limited
